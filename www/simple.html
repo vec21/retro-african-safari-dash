@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Phaser Game</title>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        #game {
+            border: 2px solid #333;
+        }
+    </style>
+</head>
+<body>
+    <div id="game"></div>
+
+    <script>
+        // Cena simples
+        class SimpleScene extends Phaser.Scene {
+            constructor() {
+                super('SimpleScene');
+            }
+            
+            preload() {
+                // Criar um sprite simples
+                this.createSimpleSprite();
+            }
+            
+            createSimpleSprite() {
+                // Criar um canvas para o sprite
+                const canvas = document.createElement('canvas');
+                canvas.width = 64;
+                canvas.height = 64;
+                const ctx = canvas.getContext('2d');
+                
+                // Desenhar um quadrado colorido
+                ctx.fillStyle = '#ff0000';
+                ctx.fillRect(0, 0, 64, 64);
+                
+                // Adicionar detalhes
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(16, 16, 32, 32);
+                
+                // Converter para base64 e adicionar ao cache
+                const base64 = canvas.toDataURL('image/png');
+                this.textures.addBase64('player', base64);
+            }
+            
+            create() {
+                // Adicionar texto
+                this.add.text(400, 100, 'Retro African Safari Dash', {
+                    fontFamily: 'Arial',
+                    fontSize: 32,
+                    color: '#ffffff'
+                }).setOrigin(0.5);
+                
+                // Adicionar sprite
+                this.player = this.physics.add.sprite(400, 300, 'player');
+                
+                // Configurar controles
+                this.cursors = this.input.keyboard.createCursorKeys();
+                
+                // Adicionar texto de instruções
+                this.add.text(400, 500, 'Use as setas para mover', {
+                    fontFamily: 'Arial',
+                    fontSize: 16,
+                    color: '#ffffff'
+                }).setOrigin(0.5);
+            }
+            
+            update() {
+                // Movimento do jogador
+                this.player.setVelocity(0);
+                
+                if (this.cursors.left.isDown) {
+                    this.player.setVelocityX(-300);
+                } else if (this.cursors.right.isDown) {
+                    this.player.setVelocityX(300);
+                }
+                
+                if (this.cursors.up.isDown) {
+                    this.player.setVelocityY(-300);
+                } else if (this.cursors.down.isDown) {
+                    this.player.setVelocityY(300);
+                }
+            }
+        }
+        
+        // Configuração do jogo
+        const config = {
+            type: Phaser.AUTO,
+            width: 800,
+            height: 600,
+            parent: 'game',
+            physics: {
+                default: 'arcade',
+                arcade: {
+                    gravity: { y: 0 },
+                    debug: false
+                }
+            },
+            scene: [SimpleScene]
+        };
+        
+        // Iniciar o jogo
+        const game = new Phaser.Game(config);
+    </script>
+</body>
+</html>

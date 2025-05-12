@@ -1,0 +1,9 @@
+{
+  "apiUrl": "https://k782z3n7ah.execute-api.us-west-2.amazonaws.com/v1/leaderboard",
+  "bucketName": "retro-safari-dash-340n6cbw",
+  "cdnHostname": "d33ejg1jsmvn6g.cloudfront.net",
+  "cdnURL": "https://d33ejg1jsmvn6g.cloudfront.net",
+  "leaderboardTableName": "leaderboard-5dfde1d",
+  "originHostname": "retro-safari-dash-340n6cbw.s3-website-us-west-2.amazonaws.com",
+  "originURL": "http://retro-safari-dash-340n6cbw.s3-website-us-west-2.amazonaws.com"
+}

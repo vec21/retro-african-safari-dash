@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug - Retro African Safari Dash</title>
+    <style>
+        body {
+            font-family: monospace;
+            background-color: #222;
+            color: #fff;
+            padding: 20px;
+        }
+        h1 {
+            color: #4CAF50;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        pre {
+            background-color: #333;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Retro African Safari Dash - Debug</h1>
+        
+        <h2>Teste de Canvas</h2>
+        <canvas id="testCanvas" width="400" height="200" style="border:1px solid #fff;"></canvas>
+        <button onclick="testCanvas()">Testar Canvas</button>
+        
+        <h2>Teste de Phaser</h2>
+        <div id="phaserTest" style="width:400px;height:200px;border:1px solid #fff;"></div>
+        <button onclick="testPhaser()">Testar Phaser</button>
+        
+        <h2>Console</h2>
+        <pre id="console"></pre>
+        
+        <h2>Ações</h2>
+        <button onclick="clearLocalStorage()">Limpar LocalStorage</button>
+        <button onclick="window.location.href='index.html'">Voltar para o Jogo</button>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js"></script>
+    <script>
+        // Função para registrar no console da página
+        function log(message) {
+            const consoleElement = document.getElementById('console');
+            consoleElement.textContent += message + '\n';
+        }
+        
+        // Teste de Canvas
+        function testCanvas() {
+            try {
+                const canvas = document.getElementById('testCanvas');
+                const ctx = canvas.getContext('2d');
+                
+                // Limpar canvas
+                ctx.fillStyle = '#000';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                // Desenhar formas
+                ctx.fillStyle = '#ff0000';
+                ctx.fillRect(50, 50, 100, 100);
+                
+                ctx.fillStyle = '#00ff00';
+                ctx.beginPath();
+                ctx.arc(250, 100, 50, 0, Math.PI * 2);
+                ctx.fill();
+                
+                log('Teste de Canvas: OK');
+            } catch (error) {
+                log('Erro no teste de Canvas: ' + error.message);
+            }
+        }
+        
+        // Teste de Phaser
+        function testPhaser() {
+            try {
+                // Verificar se Phaser está disponível
+                if (typeof Phaser === 'undefined') {
+                    throw new Error('Phaser não está carregado');
+                }
+                
+                log('Phaser versão: ' + Phaser.VERSION);
+                
+                // Criar uma instância simples do Phaser
+                const config = {
+                    type: Phaser.AUTO,
+                    width: 400,
+                    height: 200,
+                    parent: 'phaserTest',
+                    scene: {
+                        create: function() {
+                            this.add.text(100, 100, 'Phaser OK!', { fill: '#0f0' });
+                            log('Cena Phaser criada com sucesso');
+                        }
+                    }
+                };
+                
+                const game = new Phaser.Game(config);
+                log('Teste de Phaser: OK');
+            } catch (error) {
+                log('Erro no teste de Phaser: ' + error.message);
+            }
+        }
+        
+        // Limpar LocalStorage
+        function clearLocalStorage() {
+            try {
+                localStorage.clear();
+                log('LocalStorage limpo com sucesso');
+            } catch (error) {
+                log('Erro ao limpar LocalStorage: ' + error.message);
+            }
+        }
+        
+        // Inicialização
+        document.addEventListener('DOMContentLoaded', function() {
+            log('Página de debug carregada');
+            log('User Agent: ' + navigator.userAgent);
+            
+            // Verificar se Phaser está disponível
+            if (typeof Phaser !== 'undefined') {
+                log('Phaser está disponível (versão ' + Phaser.VERSION + ')');
+            } else {
+                log('ERRO: Phaser não está disponível');
+            }
+            
+            // Verificar LocalStorage
+            try {
+                localStorage.setItem('test', 'test');
+                localStorage.removeItem('test');
+                log('LocalStorage está funcionando');
+            } catch (error) {
+                log('ERRO: LocalStorage não está disponível - ' + error.message);
+            }
+        });
+    </script>
+</body>
+</html>

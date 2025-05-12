@@ -1,0 +1,1001 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Retro African Safari Dash</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.js"></script>
+    <script src="api-config.js"></script>
+    <style>
+        .menu-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        
+        .menu-title {
+            color: #FFD54F;
+            font-size: 32px;
+            margin-bottom: 30px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.7);
+        }
+        
+        .menu-button {
+            background: linear-gradient(to bottom, #8BC34A, #689F38);
+            color: #fff;
+            border: 2px solid #4CAF50;
+            padding: 12px 24px;
+            margin: 10px;
+            font-family: monospace, 'Courier New', Courier;
+            font-size: 18px;
+            cursor: pointer;
+            border-radius: 4px;
+            width: 200px;
+            text-align: center;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            transition: all 0.3s;
+        }
+        
+        .menu-button:hover {
+            background: linear-gradient(to bottom, #9CCC65, #7CB342);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 8px rgba(0,0,0,0.4);
+        }
+        
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <div id="game"></div>
+    </div>
+    
+    <div id="pause-menu" class="menu-overlay hidden">
+        <div class="menu-title">GAME PAUSED</div>
+        <button id="resume-button" class="menu-button">Resume Game</button>
+        <button id="restart-button" class="menu-button">Restart Game</button>
+        <button id="quit-button" class="menu-button">Quit Game</button>
+    </div>
+    
+    <div id="main-menu" class="menu-overlay">
+        <div class="menu-title">RETRO AFRICAN SAFARI DASH</div>
+        <button id="start-button" class="menu-button">Start Game</button>
+        <button id="credits-button" class="menu-button">Credits</button>
+    </div>
+    
+    <div id="credits-menu" class="menu-overlay hidden">
+        <div class="menu-title">CREDITS</div>
+        <p style="color: white; text-align: center; margin-bottom: 30px;">
+            Created with Amazon Q Developer<br>
+            for AWS Challenge "That's Entertainment!"<br><br>
+            © 2025
+        </p>
+        <button id="back-button" class="menu-button">Back to Menu</button>
+    </div>
+    
+    <div id="leaderboard-container" class="hidden">
+        <h2>Top Scores</h2>
+        <div id="leaderboard-list"></div>
+        <button id="play-again">Play Again</button>
+    </div>
+
+    <script>
+        // Configuração do jogo
+        const config = {
+            type: Phaser.AUTO,
+            parent: 'game',
+            width: 800,
+            height: 600,
+            backgroundColor: '#2d2d2d',
+            scene: {
+                preload: preload,
+                create: create,
+                update: update
+            },
+            physics: {
+                default: 'arcade',
+                arcade: {
+                    gravity: { y: 0 },
+                    debug: false
+                }
+            }
+        };
+
+        // Variáveis globais
+        let player;
+        let artifacts;
+        let obstacles;
+        let cursors;
+        let scoreText;
+        let livesText;
+        let score = 0;
+        let lives = 3;
+        let gameOver = false;
+        let gamePaused = false;
+        let gameStarted = false;
+        let escKey;
+        let gameSpeed = 200;
+        let music;
+        let clouds = [];
+        
+        // Configuração da API
+        const apiConfig = {
+            url: '', // Será preenchido após o deploy
+            isConfigured: false,
+            
+            // Método para configurar a URL da API
+            setApiUrl: function(url) {
+                this.url = url;
+                this.isConfigured = true;
+                console.log('API URL configurada:', url);
+            },
+            
+            // Método para verificar se a API está configurada
+            isReady: function() {
+                return this.isConfigured && this.url !== '';
+            }
+        };
+
+        // Inicializar o jogo
+        const game = new Phaser.Game(config);
+
+        // Função de pré-carregamento
+        function preload() {
+            // Carregar sprites como imagens simples
+            this.load.image('player', 'assets/sprites/explorer.png');
+            this.load.image('artifact', 'assets/sprites/artifacts.png');
+            this.load.image('obstacle', 'assets/sprites/animals.png');
+            
+            // Carregar sons
+            this.load.audio('collect', 'assets/audio/collect.mp3');
+            this.load.audio('hit', 'assets/audio/hit.mp3');
+            this.load.audio('gameover', 'assets/audio/gameover.mp3');
+            this.load.audio('music', 'assets/audio/background.mp3');
+            
+            // Adicionar tecla ESC para pausar
+            escKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
+            
+            // Adicionar eventos de carregamento para debug
+            this.load.on('complete', function() {
+                console.log('Todos os assets foram carregados com sucesso');
+            });
+            
+            this.load.on('loaderror', function(file) {
+                console.error('Erro ao carregar arquivo:', file.src);
+            });
+        }
+
+        // Função de criação
+        function create() {
+            // Não iniciar o jogo automaticamente
+            this.scene.pause();
+            
+            // Configurar elementos do jogo
+            setupGame(this);
+            
+            // Configurar menus
+            setupMenus();
+        }
+        
+        // Configurar elementos do jogo
+        function setupGame(scene) {
+            // Criar fundo
+            createBackground(scene);
+            
+            // Adicionar jogador
+            player = scene.physics.add.sprite(400, 500, 'player');
+            player.setCollideWorldBounds(true);
+            player.setScale(0.05); // Redimensionar para 5% do tamanho original (1024 -> ~50px)
+            
+            // Grupos para artefatos e obstáculos
+            artifacts = scene.physics.add.group();
+            obstacles = scene.physics.add.group();
+            
+            // Configurar colisões
+            scene.physics.add.overlap(player, artifacts, collectArtifact, null, scene);
+            scene.physics.add.overlap(player, obstacles, hitObstacle, null, scene);
+            
+            // Controles
+            cursors = scene.input.keyboard.createCursorKeys();
+            
+            // Título do jogo - movido para o topo
+            scene.add.text(400, 25, 'Retro African Safari Dash', {
+                fontSize: '28px',
+                fill: '#FFD54F',
+                fontFamily: 'monospace',
+                stroke: '#000',
+                strokeThickness: 4
+            }).setOrigin(0.5);
+            
+            // Texto de pontuação - movido para baixo do título
+            scoreText = scene.add.text(16, 70, 'Score: 0', { 
+                fontSize: '28px', 
+                fill: '#fff',
+                fontFamily: 'monospace',
+                stroke: '#000',
+                strokeThickness: 2
+            });
+            
+            // Texto de vidas - movido para baixo do título
+            livesText = scene.add.text(700, 70, 'Lives: 3', { 
+                fontSize: '28px', 
+                fill: '#fff',
+                fontFamily: 'monospace',
+                stroke: '#000',
+                strokeThickness: 2
+            }).setOrigin(1, 0);
+            
+            // Adicionar música
+            music = scene.sound.add('music', { loop: true, volume: 0.5 });
+        }
+        
+        // Função para criar o fundo
+        function createBackground(scene) {
+            // Criar um gradiente de céu
+            const sky = scene.add.graphics();
+            sky.fillGradientStyle(0x87CEEB, 0x87CEEB, 0x1E90FF, 0x1E90FF, 1);
+            sky.fillRect(0, 0, 800, 600);
+            
+            // Criar "chão" da savana
+            const ground = scene.add.graphics();
+            ground.fillStyle(0xD2B48C, 1); // Cor de areia
+            ground.fillRect(0, 500, 800, 100);
+            
+            // Adicionar sol
+            const sun = scene.add.graphics();
+            sun.fillStyle(0xFFD700, 1); // Dourado
+            sun.fillCircle(700, 100, 40);
+            
+            // Adicionar montanhas distantes
+            const mountains = scene.add.graphics();
+            mountains.fillStyle(0x8B4513, 0.6); // Marrom transparente
+            
+            // Primeira montanha
+            mountains.beginPath();
+            mountains.moveTo(0, 500);
+            mountains.lineTo(200, 350);
+            mountains.lineTo(400, 500);
+            mountains.closePath();
+            mountains.fill();
+            
+            // Segunda montanha
+            mountains.beginPath();
+            mountains.moveTo(300, 500);
+            mountains.lineTo(500, 380);
+            mountains.lineTo(700, 500);
+            mountains.closePath();
+            mountains.fill();
+            
+            // Adicionar alguns elementos decorativos (árvores, arbustos)
+            for (let i = 0; i < 5; i++) {
+                // Árvores no fundo (simplificadas)
+                const treeX = Phaser.Math.Between(50, 750);
+                const treeHeight = Phaser.Math.Between(80, 120);
+                
+                const trunk = scene.add.graphics();
+                trunk.fillStyle(0x8B4513, 1); // Marrom
+                trunk.fillRect(treeX - 5, 500 - treeHeight, 10, treeHeight);
+                
+                const foliage = scene.add.graphics();
+                foliage.fillStyle(0x228B22, 1); // Verde
+                foliage.fillCircle(treeX, 500 - treeHeight - 20, 30);
+            }
+            
+            // Adicionar nuvens como sprites para poder movê-las
+            clouds = [];
+            for (let i = 0; i < 3; i++) {
+                const cloudX = Phaser.Math.Between(100, 700);
+                const cloudY = Phaser.Math.Between(50, 150);
+                
+                // Criar uma textura para a nuvem
+                const cloudKey = 'cloud' + i;
+                const cloudGraphics = scene.make.graphics({x: 0, y: 0, add: false});
+                cloudGraphics.fillStyle(0xFFFFFF, 0.7);
+                cloudGraphics.fillCircle(30, 20, 30);
+                cloudGraphics.fillCircle(50, 10, 25);
+                cloudGraphics.fillCircle(10, 25, 25);
+                cloudGraphics.generateTexture(cloudKey, 80, 50);
+                
+                // Criar o sprite da nuvem
+                const cloud = scene.add.image(cloudX, cloudY, cloudKey);
+                clouds.push(cloud);
+            }
+        }
+        
+        // Configurar menus
+        function setupMenus() {
+            // Menu principal
+            document.getElementById('start-button').addEventListener('click', startGame);
+            document.getElementById('credits-button').addEventListener('click', showCredits);
+            
+            // Menu de pausa
+            document.getElementById('resume-button').addEventListener('click', resumeGame);
+            document.getElementById('restart-button').addEventListener('click', restartGame);
+            document.getElementById('quit-button').addEventListener('click', quitGame);
+            
+            // Menu de créditos
+            document.getElementById('back-button').addEventListener('click', backToMainMenu);
+        }
+        
+        // Iniciar temporizadores para spawn
+        function startSpawners(scene) {
+            // Limpar temporizadores existentes
+            if (scene.artifactTimer) scene.artifactTimer.remove();
+            if (scene.obstacleTimer) scene.obstacleTimer.remove();
+            if (scene.speedTimer) scene.speedTimer.remove();
+            
+            // Iniciar novos temporizadores
+            scene.artifactTimer = scene.time.addEvent({
+                delay: 1500,
+                callback: spawnArtifact,
+                callbackScope: scene,
+                loop: true
+            });
+            
+            scene.obstacleTimer = scene.time.addEvent({
+                delay: 2000,
+                callback: spawnObstacle,
+                callbackScope: scene,
+                loop: true
+            });
+            
+            // Aumentar velocidade a cada 10 segundos
+            scene.speedTimer = scene.time.addEvent({
+                delay: 10000,
+                callback: increaseSpeed,
+                callbackScope: scene,
+                loop: true
+            });
+        }
+        
+        // Função para aumentar velocidade
+        function increaseSpeed() {
+            if (gameOver || gamePaused || !gameStarted) return;
+            
+            gameSpeed += 20;
+            
+            // Mostrar texto de aumento de velocidade
+            const speedText = this.add.text(400, 300, 'Speed Up!', {
+                fontSize: '32px',
+                fill: '#ff0000',
+                fontFamily: 'monospace',
+                stroke: '#000',
+                strokeThickness: 4
+            }).setOrigin(0.5);
+            
+            // Animar texto
+            this.tweens.add({
+                targets: speedText,
+                alpha: 0,
+                y: 250,
+                duration: 1000,
+                onComplete: () => speedText.destroy()
+            });
+        }
+
+        // Função de atualização
+        function update() {
+            // Verificar tecla ESC para pausar
+            if (escKey.isDown && gameStarted && !gameOver) {
+                togglePause();
+                // Evitar múltiplos pressionamentos
+                escKey.reset();
+            }
+            
+            if (gameOver || gamePaused || !gameStarted) return;
+            
+            // Animar nuvens lentamente (efeito de movimento)
+            if (clouds) {
+                clouds.forEach(cloud => {
+                    cloud.x -= 0.2;
+                    if (cloud.x < -50) {
+                        cloud.x = 850;
+                        cloud.y = Phaser.Math.Between(50, 150);
+                    }
+                });
+            }
+            
+            // Movimento do jogador
+            player.setVelocity(0);
+            
+            if (cursors.left.isDown) {
+                player.setVelocityX(-300);
+                player.flipX = true;
+            } else if (cursors.right.isDown) {
+                player.setVelocityX(300);
+                player.flipX = false;
+            }
+            
+            if (cursors.up.isDown) {
+                player.setVelocityY(-300);
+            } else if (cursors.down.isDown) {
+                player.setVelocityY(300);
+            }
+        }
+
+        // Função para coletar artefatos
+        function collectArtifact(player, artifact) {
+            // Criar efeito de brilho
+            const glow = this.add.sprite(artifact.x, artifact.y, 'artifact').setScale(0.06);
+            glow.setAlpha(0.7);
+            glow.setTint(0xffff00);
+            
+            // Animar o brilho
+            this.tweens.add({
+                targets: glow,
+                alpha: 0,
+                scale: 0.09,
+                duration: 300,
+                onComplete: () => glow.destroy()
+            });
+            
+            // Mostrar pontuação flutuante
+            const pointsText = this.add.text(artifact.x, artifact.y, '+10', {
+                fontSize: '24px',
+                fill: '#ffff00',
+                fontFamily: 'monospace',
+                stroke: '#000',
+                strokeThickness: 2
+            }).setOrigin(0.5);
+            
+            // Animar texto de pontuação
+            this.tweens.add({
+                targets: pointsText,
+                y: artifact.y - 50,
+                alpha: 0,
+                duration: 800,
+                onComplete: () => pointsText.destroy()
+            });
+            
+            // Remover o artefato
+            artifact.destroy();
+            
+            // Atualizar pontuação
+            score += 10;
+            scoreText.setText('Score: ' + score);
+            
+            // Tocar som de coleta
+            this.sound.play('collect');
+            
+            // Efeito visual
+            this.cameras.main.flash(100, 255, 255, 255, false);
+        }
+
+        // Função para colidir com obstáculos
+        function hitObstacle(player, obstacle) {
+            // Remover o obstáculo
+            obstacle.destroy();
+            
+            // Reduzir vidas
+            lives--;
+            livesText.setText('Lives: ' + lives);
+            
+            // Tocar som de colisão
+            this.sound.play('hit');
+            
+            // Efeito visual
+            this.cameras.main.shake(100, 0.01);
+            
+            // Mostrar dano flutuante
+            const damageText = this.add.text(player.x, player.y, '-1 LIFE', {
+                fontSize: '24px',
+                fill: '#ff0000',
+                fontFamily: 'monospace',
+                stroke: '#000',
+                strokeThickness: 2
+            }).setOrigin(0.5);
+            
+            // Animar texto de dano
+            this.tweens.add({
+                targets: damageText,
+                y: player.y - 50,
+                alpha: 0,
+                duration: 800,
+                onComplete: () => damageText.destroy()
+            });
+            
+            // Game over se acabarem as vidas
+            if (lives <= 0) {
+                endGame.call(this);
+            }
+        }
+
+        // Função para spawnar artefatos
+        function spawnArtifact() {
+            if (gameOver || gamePaused || !gameStarted) return;
+            
+            const x = Phaser.Math.Between(50, 750);
+            const artifact = artifacts.create(x, -20, 'artifact');
+            
+            // Redimensionar o artefato
+            artifact.setScale(0.03); // 3% do tamanho original
+            
+            // Configurar velocidade baseada na velocidade do jogo
+            artifact.setVelocityY(gameSpeed);
+            
+            // Remover quando sair da tela
+            artifact.checkWorldBounds = true;
+            artifact.outOfBoundsKill = true;
+        }
+
+        // Função para spawnar obstáculos
+        function spawnObstacle() {
+            if (gameOver || gamePaused || !gameStarted) return;
+            
+            const x = Phaser.Math.Between(50, 750);
+            const obstacle = obstacles.create(x, -20, 'obstacle');
+            
+            // Redimensionar o obstáculo
+            obstacle.setScale(0.04); // 4% do tamanho original
+            
+            // Configurar velocidade baseada na velocidade do jogo
+            obstacle.setVelocityY(gameSpeed * 1.2);
+            
+            // Remover quando sair da tela
+            obstacle.checkWorldBounds = true;
+            obstacle.outOfBoundsKill = true;
+        }
+
+        // Função de fim de jogo
+        function endGame() {
+            gameOver = true;
+            gameStarted = false;
+            
+            // Parar música de fundo
+            if (music && music.isPlaying) {
+                music.stop();
+            }
+            
+            // Tocar som de game over
+            this.sound.play('gameover');
+            
+            // Parar todos os objetos
+            artifacts.getChildren().forEach(artifact => {
+                artifact.setVelocity(0);
+            });
+            
+            obstacles.getChildren().forEach(obstacle => {
+                obstacle.setVelocity(0);
+            });
+            
+            // Texto de game over
+            this.add.text(400, 300, 'GAME OVER', {
+                fontSize: '64px',
+                fill: '#ff0000',
+                fontFamily: 'monospace',
+                stroke: '#000',
+                strokeThickness: 6
+            }).setOrigin(0.5);
+            
+            // Texto de pontuação final
+            this.add.text(400, 370, 'Final Score: ' + score, {
+                fontSize: '32px',
+                fill: '#fff',
+                fontFamily: 'monospace',
+                stroke: '#000',
+                strokeThickness: 4
+            }).setOrigin(0.5);
+            
+            // Criar formulário de login
+            createLoginForm(this, score);
+            
+            // Botão para voltar ao menu
+            const menuButton = this.add.text(400, 520, 'Main Menu', {
+                fontSize: '24px',
+                fill: '#fff',
+                backgroundColor: '#2196F3',
+                padding: { left: 15, right: 15, top: 10, bottom: 10 },
+                fontFamily: 'monospace'
+            }).setOrigin(0.5);
+            
+            menuButton.setInteractive({ useHandCursor: true });
+            menuButton.on('pointerdown', quitGame);
+        }
+        
+        // Função para criar formulário de login
+        function createLoginForm(scene, finalScore) {
+            // Grupo para os elementos do formulário
+            const formGroup = scene.add.group();
+            
+            // Fundo do formulário
+            const formBg = scene.add.rectangle(400, 450, 400, 120, 0x333333, 0.8);
+            formBg.setOrigin(0.5);
+            formGroup.add(formBg);
+            
+            // Texto de instruções
+            const loginText = scene.add.text(400, 410, 'Login to submit score:', {
+                fontSize: '18px',
+                fill: '#ffffff',
+                fontFamily: 'monospace'
+            }).setOrigin(0.5);
+            formGroup.add(loginText);
+            
+            // Botões de login
+            const adminButton = scene.add.text(300, 450, 'Admin Login', {
+                fontSize: '16px',
+                fill: '#ffffff',
+                backgroundColor: '#e91e63',
+                padding: { left: 10, right: 10, top: 5, bottom: 5 },
+                fontFamily: 'monospace'
+            }).setOrigin(0.5);
+            
+            const userButton = scene.add.text(500, 450, 'User Login', {
+                fontSize: '16px',
+                fill: '#ffffff',
+                backgroundColor: '#2196F3',
+                padding: { left: 10, right: 10, top: 5, bottom: 5 },
+                fontFamily: 'monospace'
+            }).setOrigin(0.5);
+            
+            const guestButton = scene.add.text(400, 490, 'Continue as Guest', {
+                fontSize: '16px',
+                fill: '#ffffff',
+                backgroundColor: '#4CAF50',
+                padding: { left: 10, right: 10, top: 5, bottom: 5 },
+                fontFamily: 'monospace'
+            }).setOrigin(0.5);
+            
+            formGroup.add(adminButton);
+            formGroup.add(userButton);
+            formGroup.add(guestButton);
+            
+            // Tornar botões interativos
+            adminButton.setInteractive({ useHandCursor: true });
+            userButton.setInteractive({ useHandCursor: true });
+            guestButton.setInteractive({ useHandCursor: true });
+            
+            // Eventos de hover
+            adminButton.on('pointerover', () => { adminButton.setBackgroundColor('#d81b60'); });
+            adminButton.on('pointerout', () => { adminButton.setBackgroundColor('#e91e63'); });
+            
+            userButton.on('pointerover', () => { userButton.setBackgroundColor('#1e88e5'); });
+            userButton.on('pointerout', () => { userButton.setBackgroundColor('#2196F3'); });
+            
+            guestButton.on('pointerover', () => { guestButton.setBackgroundColor('#43a047'); });
+            guestButton.on('pointerout', () => { guestButton.setBackgroundColor('#4CAF50'); });
+            
+            // Eventos de clique
+            adminButton.on('pointerdown', () => {
+                submitScore(finalScore, 'admin', 'admin', '2025DEVChallenge');
+                formGroup.clear(true, true);
+            });
+            
+            userButton.on('pointerdown', () => {
+                submitScore(finalScore, 'newuser', 'newuser', '2025DEVChallenge');
+                formGroup.clear(true, true);
+            });
+            
+            guestButton.on('pointerdown', () => {
+                submitScore(finalScore, 'Guest' + Math.floor(Math.random() * 1000));
+                formGroup.clear(true, true);
+            });
+        }
+        
+        // Função para enviar pontuação para o leaderboard
+        function submitScore(score, playerName, username, password) {
+            // Gerar dados para envio
+            const scoreData = {
+                playerName: playerName,
+                score: score
+            };
+            
+            // Adicionar credenciais se fornecidas
+            if (username && password) {
+                scoreData.username = username;
+                scoreData.password = password;
+            }
+            
+            // Enviar para a API se configurada
+            if (apiConfig.isReady()) {
+                fetch(apiConfig.url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(scoreData)
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Erro ao enviar pontuação');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('Pontuação enviada com sucesso:', data);
+                    // Mostrar leaderboard após envio bem-sucedido
+                    fetchLeaderboard();
+                })
+                .catch(error => {
+                    console.error('Erro ao enviar pontuação:', error);
+                    // Fallback para armazenamento local
+                    saveScoreLocally(score, playerName);
+                    showLocalLeaderboard();
+                });
+            } else {
+                // Salvar localmente se API não estiver configurada
+                saveScoreLocally(score, playerName);
+                showLocalLeaderboard();
+            }
+        }
+        
+        // Função para buscar leaderboard da API
+        function fetchLeaderboard() {
+            if (apiConfig.isReady()) {
+                fetch(apiConfig.url)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Erro ao buscar leaderboard');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    showLeaderboardScreen(data);
+                })
+                .catch(error => {
+                    console.error('Erro ao buscar leaderboard:', error);
+                    showLocalLeaderboard();
+                });
+            } else {
+                showLocalLeaderboard();
+            }
+        }
+        
+        // Função para salvar pontuação localmente
+        function saveScoreLocally(score, playerName) {
+            const leaderboard = JSON.parse(localStorage.getItem('leaderboard') || '[]');
+            
+            leaderboard.push({
+                playerName: playerName,
+                score: score,
+                timestamp: new Date().toISOString()
+            });
+            
+            // Ordenar por pontuação (maior primeiro)
+            leaderboard.sort((a, b) => b.score - a.score);
+            
+            // Manter apenas os 10 melhores
+            const top10 = leaderboard.slice(0, 10);
+            
+            localStorage.setItem('leaderboard', JSON.stringify(top10));
+            console.log('Pontuação salva localmente');
+        }
+        
+        // Função para mostrar leaderboard local
+        function showLocalLeaderboard() {
+            const leaderboard = JSON.parse(localStorage.getItem('leaderboard') || '[]');
+            
+            // Se vazio, adicionar alguns scores padrão
+            if (leaderboard.length === 0) {
+                leaderboard.push(
+                    { playerName: 'Player1', score: 100 },
+                    { playerName: 'Player2', score: 80 },
+                    { playerName: 'Player3', score: 60 },
+                    { playerName: 'Player4', score: 40 },
+                    { playerName: 'Player5', score: 20 }
+                );
+            }
+            
+            showLeaderboardScreen(leaderboard);
+        }
+        
+        // Função para mostrar tela de leaderboard
+        function showLeaderboardScreen(leaderboardData) {
+            // Limpar a cena atual
+            game.scene.scenes[0].children.list.forEach(child => {
+                if (child.type === 'Text' || child.type === 'Rectangle') {
+                    child.destroy();
+                }
+            });
+            
+            const currentScene = game.scene.scenes[0];
+            
+            // Fundo do leaderboard
+            const bg = currentScene.add.rectangle(400, 300, 600, 500, 0x000000, 0.8);
+            
+            // Título
+            currentScene.add.text(400, 100, 'LEADERBOARD', {
+                fontSize: '36px',
+                fill: '#FFD700',
+                fontFamily: 'monospace',
+                stroke: '#000',
+                strokeThickness: 4
+            }).setOrigin(0.5);
+            
+            // Cabeçalho
+            currentScene.add.text(200, 150, 'RANK', {
+                fontSize: '24px',
+                fill: '#ffffff',
+                fontFamily: 'monospace'
+            }).setOrigin(0.5);
+            
+            currentScene.add.text(350, 150, 'PLAYER', {
+                fontSize: '24px',
+                fill: '#ffffff',
+                fontFamily: 'monospace'
+            }).setOrigin(0.5);
+            
+            currentScene.add.text(550, 150, 'SCORE', {
+                fontSize: '24px',
+                fill: '#ffffff',
+                fontFamily: 'monospace'
+            }).setOrigin(0.5);
+            
+            // Entradas do leaderboard
+            const startY = 200;
+            const spacing = 30;
+            
+            leaderboardData.forEach((entry, index) => {
+                // Cor baseada na posição
+                let color = '#ffffff';
+                if (index === 0) color = '#FFD700'; // Ouro
+                else if (index === 1) color = '#C0C0C0'; // Prata
+                else if (index === 2) color = '#CD7F32'; // Bronze
+                
+                // Rank
+                currentScene.add.text(200, startY + index * spacing, `${index + 1}`, {
+                    fontSize: '20px',
+                    fill: color,
+                    fontFamily: 'monospace'
+                }).setOrigin(0.5);
+                
+                // Nome do jogador
+                currentScene.add.text(350, startY + index * spacing, entry.playerName, {
+                    fontSize: '20px',
+                    fill: color,
+                    fontFamily: 'monospace'
+                }).setOrigin(0.5);
+                
+                // Pontuação
+                currentScene.add.text(550, startY + index * spacing, entry.score.toString(), {
+                    fontSize: '20px',
+                    fill: color,
+                    fontFamily: 'monospace'
+                }).setOrigin(0.5);
+            });
+            
+            // Botão para jogar novamente
+            const playAgainButton = currentScene.add.text(400, 500, 'PLAY AGAIN', {
+                fontSize: '24px',
+                fill: '#ffffff',
+                backgroundColor: '#4CAF50',
+                padding: { left: 15, right: 15, top: 10, bottom: 10 },
+                fontFamily: 'monospace'
+            }).setOrigin(0.5);
+            
+            playAgainButton.setInteractive({ useHandCursor: true });
+            
+            playAgainButton.on('pointerover', () => {
+                playAgainButton.setBackgroundColor('#45a049');
+            });
+            
+            playAgainButton.on('pointerout', () => {
+                playAgainButton.setBackgroundColor('#4CAF50');
+            });
+            
+            playAgainButton.on('pointerdown', () => {
+                currentScene.scene.restart();
+                score = 0;
+                lives = 3;
+                gameOver = false;
+                gameStarted = true;
+            });
+        }
+        
+        // Funções de controle do jogo
+        function startGame() {
+            document.getElementById('main-menu').classList.add('hidden');
+            document.getElementById('credits-menu').classList.add('hidden');
+            
+            gameStarted = true;
+            gamePaused = false;
+            gameOver = false;
+            score = 0;
+            lives = 3;
+            gameSpeed = 200;
+            
+            // Reiniciar a cena
+            const currentScene = game.scene.scenes[0];
+            currentScene.scene.restart();
+            
+            // Iniciar temporizadores após um pequeno delay
+            setTimeout(() => {
+                if (currentScene && currentScene.scene) {
+                    currentScene.scene.resume();
+                    startSpawners(currentScene);
+                    
+                    // Iniciar música
+                    if (music) {
+                        music.play();
+                    }
+                    
+                    // Atualizar textos
+                    if (scoreText) {
+                        scoreText.setText('Score: 0');
+                    }
+                    if (livesText) {
+                        livesText.setText('Lives: 3');
+                    }
+                }
+            }, 100);
+        }
+        
+        function togglePause() {
+            if (gamePaused) {
+                resumeGame();
+            } else {
+                pauseGame();
+            }
+        }
+        
+        function pauseGame() {
+            gamePaused = true;
+            game.scene.pause();
+            
+            // Pausar música
+            if (music && music.isPlaying) {
+                music.pause();
+            }
+            
+            document.getElementById('pause-menu').classList.remove('hidden');
+        }
+        
+        function resumeGame() {
+            gamePaused = false;
+            game.scene.resume();
+            
+            // Retomar música
+            if (music && !music.isPlaying) {
+                music.resume();
+            }
+            
+            document.getElementById('pause-menu').classList.add('hidden');
+        }
+        
+        function restartGame() {
+            document.getElementById('pause-menu').classList.add('hidden');
+            startGame();
+        }
+        
+        function quitGame() {
+            gameStarted = false;
+            gamePaused = false;
+            gameOver = false;
+            
+            // Parar a cena
+            game.scene.pause();
+            
+            // Parar música
+            if (music && music.isPlaying) {
+                music.stop();
+            }
+            
+            // Mostrar menu principal
+            document.getElementById('pause-menu').classList.add('hidden');
+            document.getElementById('credits-menu').classList.add('hidden');
+            document.getElementById('main-menu').classList.remove('hidden');
+        }
+        
+        function showCredits() {
+            document.getElementById('main-menu').classList.add('hidden');
+            document.getElementById('credits-menu').classList.remove('hidden');
+        }
+        
+        function backToMainMenu() {
+            document.getElementById('credits-menu').classList.add('hidden');
+            document.getElementById('main-menu').classList.remove('hidden');
+        }
+    </script>
+</body>
+</html>

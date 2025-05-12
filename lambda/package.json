@@ -1,0 +1,11 @@
+{
+  "name": "retro-african-safari-dash-leaderboard",
+  "version": "1.0.0",
+  "description": "Lambda function for Retro African Safari Dash leaderboard",
+  "main": "index.js",
+  "dependencies": {
+    "aws-sdk": "^2.1099.0"
+  },
+  "author": "",
+  "license": "MIT"
+}
